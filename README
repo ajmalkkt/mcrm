@@ -1,0 +1,153 @@
+🚀 Mini-CRM for Telecom & ISP Services
+A lightweight, enterprise-ready Mini-CRM designed for Middle East telecom and ISP providers. The platform manages lead prospects, active customer accounts, multi-service subscriptions (Fiber, Mobile, 5G Broadband), bulk Excel ingestion, and proactive agent call schedules.
+
+🏗️ Architecture & Tech Stack
+Frontend: React 19, TypeScript, Tailwind CSS, TanStack Query, TanStack Table
+
+Backend: Node.js (Express / Fastify) or Python (FastAPI)
+
+Database: PostgreSQL 16+ (Supports native Row-Level Security)
+
+Storage Abstraction: Local Disk, AWS S3, or Azure Blob Storage
+
+Containerization: Docker & Docker Compose with Profile-based deployment
+
+📂 Project Structure
+Plaintext
+mini-crm/
+├── README.md                       # Documentation & Setup Guide
+├── .env.example                    # Environment template
+├── docker-compose.yml              # Container orchestration
+│
+├── database/                       # Database scripts & DDL
+│   └── init-scripts/
+│       ├── 01_schema.sql           # Core tables, indexes, RLS setup
+│       └── 02_seed.sql             # Master data (Products, Plans)
+│
+├── backend/                        # API & Business Logic
+│   ├── src/
+│   │   ├── config/database.js      # Dynamic Dual-DB Connection Manager
+│   │   ├── api/                    # REST API Controllers
+│   │   └── services/               # Ingestion, DMS & Assignment Engines
+│   ├── Dockerfile
+│   └── package.json
+│
+└── frontend/                       # Web Dashboard UI
+    ├── src/                        # UI Components & Page Views
+    ├── Dockerfile
+    └── package.json
+⚙️ Configuration Strategy (Dual DB Modes)
+The application supports two deployment configurations:
+
+DOCKER_CONTAINER Mode: Spins up an isolated PostgreSQL 16 database inside Docker and automatically runs DDL migration scripts.
+
+EXISTING_EXTERNAL Mode: Bypasses local DB creation and connects directly to an existing corporate database (e.g., managed AWS Aurora, Azure Postgres, or client on-premise DB server).
+
+Environment Configuration (.env)
+Copy .env.example to create your local .env file:
+
+Bash
+cp .env.example .env
+Set your deployment mode and connection parameters in .env:
+
+Ini, TOML
+# ==============================================================================
+# DATABASE DEPLOYMENT MODE
+# Values: "DOCKER_CONTAINER" | "EXISTING_EXTERNAL"
+# ==============================================================================
+DB_DEPLOYMENT_MODE=DOCKER_CONTAINER
+
+# ------------------------------------------------------------------------------
+# Option 1: Internal Docker Database Settings
+# ------------------------------------------------------------------------------
+DOCKER_DB_HOST=postgres-db
+DOCKER_DB_PORT=5432
+DOCKER_DB_NAME=mcrm
+DOCKER_DB_USER=crm_admin
+DOCKER_DB_PASSWORD=secret_local_pass
+
+# ------------------------------------------------------------------------------
+# Option 2: Existing / External Client Database Settings
+# ------------------------------------------------------------------------------
+EXTERNAL_DB_HOST=10.0.0.15
+EXTERNAL_DB_PORT=5432
+EXTERNAL_DB_NAME=existing_telecom_crm
+EXTERNAL_DB_USER=db_client_user
+EXTERNAL_DB_PASSWORD=client_secure_password
+EXTERNAL_DB_SSL=false
+🛠️ Step-by-Step Setup & Run Guide
+Prerequisites
+Docker Desktop (v24.0+)
+
+Node.js (v20+ - for local non-Docker development)
+
+VS Code with Docker & PostgreSQL extensions
+
+#****Scenario A: Run with Containerized Docker Database****
+Use this mode for local development, demo environments, or isolated testing.
+
+1. Configure .env
+Ensure your .env is set to DOCKER_CONTAINER:
+
+Ini, TOML
+DB_DEPLOYMENT_MODE=DOCKER_CONTAINER
+2. Start Services via Docker Compose
+Run Docker Compose with the --profile local-db flag to spin up PostgreSQL alongside the application:
+
+Bash
+
+docker compose --profile local-db up --build -d
+
+💡 Note: On first startup, PostgreSQL automatically initializes the schema by executing all .sql scripts inside ./database/init-scripts/.
+
+3. Verify Containers
+Bash
+docker compose ps
+You should see 3 running containers: mcrm_postgres, mcrm_backend, and mcrm_frontend.
+
+***Scenario B: Connect to an Existing Client Database***
+Use this mode when integrating with a client's existing database instance without creating a new PostgreSQL container.
+
+1. Initialize Existing Database Schema
+Before launching the application, apply the database schema to the target database:
+
+Using psql:
+
+Bash
+psql -h <EXTERNAL_DB_HOST> -U <EXTERNAL_DB_USER> -d <EXTERNAL_DB_NAME> -f database/init-scripts/01_schema.sql
+psql -h <EXTERNAL_DB_HOST> -U <EXTERNAL_DB_USER> -d <EXTERNAL_DB_NAME> -f database/init
+
+(Alternatively, run 01_schema.sql and 02_seed.sql inside tools like DBeaver, pgAdmin, or Azure Data Studio).
+
+2. Configure .env
+Update your .env to point to the external database credentials:
+
+Ini, TOML
+DB_DEPLOYMENT_MODE=EXISTING_EXTERNAL
+
+EXTERNAL_DB_HOST=10.0.0.15
+EXTERNAL_DB_PORT=5432
+EXTERNAL_DB_NAME=existing_telecom_crm
+EXTERNAL_DB_USER=db_client_user
+EXTERNAL_DB_PASSWORD=client_secure_password
+EXTERNAL_DB_SSL=true
+
+***Scenario C: Local Non-Docker Development (VS Code Debugging)***
+If you are writing code in VS Code and want hot-reloading without rebuilding containers:
+
+Start Database (if using local container):
+
+Bash
+docker compose up postgres-db -d
+Run Backend API locally:
+
+Bash
+cd backend
+npm install
+npm run dev
+Run Frontend UI locally:
+
+Bash
+cd frontend
+npm install
+npm run dev

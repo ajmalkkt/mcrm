@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # --------------------------------------------------------
+  # PostgreSQL Container (Included in 'local-db' profile)
+  # Executed ONLY when DB_DEPLOYMENT_MODE=DOCKER_CONTAINER
+  # --------------------------------------------------------
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: mcrm_postgres
+    restart: unless-stopped
+    profiles:
+      - local-db
+    environment:
+      POSTGRES_DB: ${DOCKER_DB_NAME:-minicrm}
+      POSTGRES_USER: ${DOCKER_DB_USER:-crm_admin}
+      POSTGRES_PASSWORD: ${DOCKER_DB_PASSWORD:-secret_local_pass}
+    ports:
+      - "${DOCKER_DB_PORT:-5432}:5432"
+    volumes:
+      # Automatically mounts initialization SQL scripts on initial boot
+      - ./database/init-scripts:/docker-entrypoint-initdb.d
+      - postgres_data_vol:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DOCKER_DB_USER:-crm_admin} -d ${DOCKER_DB_NAME:-minicrm}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------------------------
+  # Backend API Service
+  # --------------------------------------------------------
+  backend-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mcrm_backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    ports:
+      - "${PORT:-5000}:5000"
+
+  # --------------------------------------------------------
+  # Frontend React App UI
+  # --------------------------------------------------------
+  frontend-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:5000/api/v1}
+    container_name: mcrm_frontend
+    restart: unless-stopped
+    env_file:
+      - ./frontend/.env
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend-service
+
+volumes:
+  postgres_data_vol:
+    driver: local
