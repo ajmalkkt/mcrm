@@ -2,3 +2,7 @@
 *.env.local
 *.env.production
 *.env.example
+*pwd*
+*password*
+**.secret
+*node_modules/

@@ -28,7 +28,24 @@ function getDatabaseConfig() {
 
 const pool = new Pool(getDatabaseConfig());
 
+// Event listener for unexpected errors on idle clients
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle database client', err);
+});
+
+// Helper method to verify DB connection during server initialization
+const checkDbConnection = async () => {
+  const client = await pool.connect();
+  try {
+    const res = await client.query('SELECT NOW()');
+    return { success: true, timestamp: res.rows[0].now };
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   query: (text, params) => pool.query(text, params),
+  checkDbConnection,
   pool,
 };

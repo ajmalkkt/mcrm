@@ -1,15 +1,21 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
+    "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["DOM", "ESNext"],
     "module": "ESNext",
-    "moduleResolution": "Node",
-    "strict": true,
-    "jsx": "react-jsx",
-    "esModuleInterop": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Add Vite types here */
+    "types": ["vite/client"]
   },
   "include": ["src"]
 }

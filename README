@@ -36,6 +36,26 @@ mini-crm/
     ├── src/                        # UI Components & Page Views
     ├── Dockerfile
     └── package.json
+ 
+⚙️Authentication related object:
+Ensure your ./frontend project includes these files:
+
+frontend/src/
+├── api/
+│   ├── client.ts              # Axios instance (Intercepts JWT headers)
+│   └── auth.ts                # Login & Profile API calls
+├── context/
+│   └── AuthContext.tsx        # Global Auth State Provider
+├── components/
+│   └── ProtectedRoute.tsx     # Guard for protected routes & RBAC
+├── pages/
+│   ├── LoginPage.tsx          # Login Form with Tailwind UI
+│   └── DashboardPage.tsx      # Sample protected page
+├── types/
+│   └── auth.ts                # User & Auth TypeScript interfaces
+├── App.tsx
+└── main.tsx
+
 ⚙️ Configuration Strategy (Dual DB Modes)
 The application supports two deployment configurations:
 
@@ -100,6 +120,12 @@ docker compose --profile local-db up --build -d
 
 💡 Note: On first startup, PostgreSQL automatically initializes the schema by executing all .sql scripts inside ./database/init-scripts/.
 
+*** To build everything without using cache**
+    Step 3: Rebuild Docker Compose without Cache
+    Docker Compose often caches previous node_modules build layers. Force Docker to rebuild all images without using cached layers:
+    Bash
+    docker compose build --no-cache
+
 3. Verify Containers
 Bash
 docker compose ps
@@ -151,3 +177,50 @@ Bash
 cd frontend
 npm install
 npm run dev
+
+**Application Access Endpoints**
+Service              Endpoint                      Description
+---------------------------------------------------------------
+Frontend Web UI      http://localhost:3000         Main CRM  
+                                                   Dashboard & Agent  Workspace
+Backend REST API     http://localhost:5000/api/v1  API Base URL
+
+Health Check         http://localhost:5000/health  Service & Database 
+                                                   Status Check
+        
+🧹 Maintenance & Troubleshooting CommandsCheck 
+        
+Application Logs:
+Bash
+    docker compose logs -f backend-service
+Specific  docker container log:    docker logs -f mcrm_postgres
+Stop All Running Services:
+Bash
+    docker compose --profile local-db down
+
+Reset Local Database (Wipe Data & Re-seed):
+Bash
+    docker compose --profile local-db down -v
+    docker compose --profile local-db up --build -d
+DB login:
+psql -U crm_admin -d mcrm  -- In Docker Desktop exec tab.
+docker exec -it mcrm_postgres psql -U crm_admin -d mcrm  --CMD/PS1
+mcrm=# SELECT * FROM Master_Product;
+***Why You Need Dockerfiles (inside individula project)**
+Docker Compose coordinates and runs your services, but it doesn't know how to package or run your code unless you provide instructions.
+
+docker-compose.yml is the Manager: It defines network bridges, port mappings, volumes, environment variables, and how containers talk to each other.
+
+Dockerfile is the Recipe: It lives inside each project folder (./backend and ./frontend). It tells Docker:
+
+What base runtime to install (e.g., Node.js or Python, Nginx).
+
+How to copy your code into the container.
+
+Which dependencies to install (npm install or pip install).
+
+How to build assets (e.g., compiling React TSX into static HTML/JS).
+
+What exact command starts the app inside the container.
+
+Without Dockerfiles, running docker compose up --build will fail because Docker cannot build the container images for backend-service and frontend-ui.

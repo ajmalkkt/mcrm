@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+pwdGen*
+.env
+.env.local
+.DS_Store
+.vscode
+.git
+.gitignore
+coverage
+logs
+*.log
