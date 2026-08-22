@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Prospect, 
-  ProspectStatus 
+import {
+  Prospect,
+  ProspectStatus
 } from '../types/prospect';
 import { prospectsApi } from '../api/prospects';
 import { AddProspectModal } from '../components/prospects/AddProspectModal';
+import { ConvertProspectModal } from '../components/prospects/ConvertModal';
+import { useScreenProtection } from '../hooks/useScreenProtection';
 import { 
   Users, 
   Plus, 
-  Search, 
   LayoutGrid, 
   List, 
   Phone, 
@@ -20,32 +21,37 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const STATUS_CONFIG: Record<ProspectStatus, { label: string; color: string; badge: string }> = {
+const STATUS_CONFIG: Record<ProspectStatus, { label: string; color: string; badge: string; icon: string }> = {
   NEW: { 
     label: 'New', 
-    color: 'bg-sky-500/10 border-sky-200 text-sky-700', 
-    badge: 'bg-sky-100 text-sky-800 border-sky-300' 
+    color: 'bg-blue-500/10 border-blue-200 text-blue-700', 
+    badge: 'bg-blue-100 text-blue-800 border-blue-300',
+    icon: 'new_label'
   },
   IN_PROGRESS: { 
-    label: 'In Progress', 
+    label: 'Qualifying', 
     color: 'bg-amber-500/10 border-amber-200 text-amber-700', 
-    badge: 'bg-amber-100 text-amber-800 border-amber-300' 
+    badge: 'bg-amber-100 text-amber-800 border-amber-300',
+    icon: 'hourglass_top'
   },
   CONVERTED: { 
     label: 'Converted', 
     color: 'bg-emerald-500/10 border-emerald-200 text-emerald-700', 
-    badge: 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+    badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    icon: 'check_circle'
   },
   REJECTED: { 
     label: 'Rejected', 
     color: 'bg-rose-500/10 border-rose-200 text-rose-700', 
-    badge: 'bg-rose-100 text-rose-800 border-rose-300' 
+    badge: 'bg-rose-100 text-rose-800 border-rose-300',
+    icon: 'cancel'
   }
 };
 
 const KANBAN_STAGES: ProspectStatus[] = ['NEW', 'IN_PROGRESS', 'CONVERTED', 'REJECTED'];
 
 export const ProspectsPage: React.FC = () => {
+  useScreenProtection(true);
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +63,8 @@ export const ProspectsPage: React.FC = () => {
 
   // Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [conversionProspect, setConversionProspect] = useState<Prospect | null>(null);
+  const [showConversionModal, setShowConversionModal] = useState<boolean>(false);
 
   useEffect(() => {
     fetchProspects();
@@ -96,31 +104,76 @@ export const ProspectsPage: React.FC = () => {
     setProspects((prev) => [newProspect, ...prev]);
   };
 
+  // Handle Conversion Modal 
+  const handleOpenConversion = (prospect: Prospect) => {
+    setConversionProspect(prospect);
+    setShowConversionModal(true);
+  };
+
+  const handleDeleteProspect = async (prospectId: string) => {
+    if (!window.confirm('Delete this prospect from the pipeline?')) {
+      return;
+    }
+
+    try {
+      await prospectsApi.deleteProspect(prospectId);
+      setProspects((prev) => prev.filter((p) => p.prospect_id !== prospectId));
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Failed to delete prospect');
+    }
+  };
+
+  const handleReadyProspect = async (prospectId: string) => {
+    try {
+      await prospectsApi.updateProspect(prospectId, { status: 'IN_PROGRESS' });
+      setProspects((prev) =>
+        prev.map((p) =>
+          p.prospect_id === prospectId ? { ...p, status: 'IN_PROGRESS' as ProspectStatus } : p
+        )
+      );
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Failed to update prospect status');
+    }
+  };
+
+  // Handle Conversion Complete
+  const handleConversionComplete = (prospectId: string, accountId: string) => {
+    setProspects(prev => 
+      prev.map(p => 
+        p.prospect_id === prospectId 
+          ? { ...p, status: 'CONVERTED' as ProspectStatus }
+          : p
+      )
+    );
+    setShowConversionModal(false);
+    setConversionProspect(null);
+  };
+
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-margin-desktop bg-background flex-1">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-stack-lg">
         <div>
           <div className="flex items-center gap-2">
-            <Users className="w-6 h-6 text-indigo-600" />
-            <h1 className="text-2xl font-bold text-slate-800">Prospects Directory</h1>
+            <span className="material-symbols-outlined text-secondary" style={{ fontSize: '28px' }}>person_search</span>
+            <h1 className="font-display-lg text-display-lg text-primary">Lead Qualification Pipeline</h1>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Track, convert, and manage prospective clients through your acquisition pipeline.
+          <p className="text-body-lg text-on-surface-variant mt-1">
+            Track, qualify, and convert prospective clients through your acquisition pipeline.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={fetchProspects}
-            className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 rounded-lg transition"
+            className="p-2 text-on-surface-variant hover:text-secondary-container hover:bg-surface-container border border-outline-variant rounded-lg transition"
             title="Refresh List"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow-sm transition"
+            className="inline-flex items-center gap-2 bg-secondary-container text-on-secondary-container font-label-md text-label-md px-4 py-2.5 rounded-lg shadow-sm hover:bg-secondary transition"
           >
             <Plus className="w-4 h-4" />
             <span>Add Prospect</span>
@@ -129,16 +182,16 @@ export const ProspectsPage: React.FC = () => {
       </div>
 
       {/* Control Bar: Filters & View Toggles */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-surface-container-lowest p-stack-md rounded-xl border border-outline-variant shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 mb-stack-lg">
         {/* Search */}
         <div className="relative w-full md:w-72">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" style={{ fontSize: '18px' }}>search</span>
           <input
             type="text"
             placeholder="Search by name, email, or phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full text-xs pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full text-body-md pl-9 pr-3 py-2 border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary bg-surface-container-low"
           />
         </div>
 
@@ -146,11 +199,11 @@ export const ProspectsPage: React.FC = () => {
         <div className="flex items-center justify-between w-full md:w-auto gap-4">
           {/* Status Dropdown */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-600">Status:</span>
+            <span className="text-label-md font-label-md text-on-surface-variant">Status:</span>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="text-label-md bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-secondary"
             >
               <option value="ALL">All Statuses ({prospects.length})</option>
               {KANBAN_STAGES.map((s) => (
@@ -162,27 +215,27 @@ export const ProspectsPage: React.FC = () => {
           </div>
 
           {/* View Toggle */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
+          <div className="flex items-center bg-surface-container p-1 rounded-lg border border-outline-variant">
             <button
               onClick={() => setViewMode('kanban')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-label-md font-label-md transition ${
                 viewMode === 'kanban'
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-surface-container-lowest text-secondary shadow-sm'
+                  : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <LayoutGrid className="w-4 h-4" />
               <span>Board</span>
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-label-md font-label-md transition ${
                 viewMode === 'list'
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-surface-container-lowest text-secondary shadow-sm'
+                  : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
-              <List className="w-3.5 h-3.5" />
+              <List className="w-4 h-4" />
               <span>List</span>
             </button>
           </div>
@@ -192,43 +245,43 @@ export const ProspectsPage: React.FC = () => {
       {/* Loading & Error States */}
       {loading ? (
         <div className="flex items-center justify-center min-h-[300px]">
-          <div className="flex items-center gap-3 text-slate-500">
-            <RefreshCw className="w-5 h-5 animate-spin text-indigo-600" />
-            <span className="font-medium text-xs">Loading prospects pipeline...</span>
+          <div className="flex items-center gap-3 text-on-surface-variant">
+            <div className="w-6 h-6 animate-spin text-secondary border-2 border-secondary-fixed rounded-full border-t-secondary"></div>
+            <span className="font-body-md text-body-md">Loading prospects pipeline...</span>
           </div>
         </div>
       ) : error ? (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 flex items-center justify-between text-xs">
+        <div className="p-4 bg-error-container border border-error rounded-lg text-on-error-container flex items-center justify-between text-label-md">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600" />
+            <AlertCircle className="w-5 h-5" />
             <span className="font-medium">{error}</span>
           </div>
           <button
             onClick={fetchProspects}
-            className="px-3 py-1 bg-rose-600 text-white font-semibold rounded hover:bg-rose-700 transition"
+            className="px-3 py-1 bg-error text-on-error font-label-md rounded hover:opacity-90 transition"
           >
             Retry
           </button>
         </div>
       ) : filteredProspects.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center max-w-md mx-auto">
-          <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-sm font-bold text-slate-700">No Prospects Found</h3>
-          <p className="text-xs text-slate-500 mt-1">
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-12 text-center max-w-md mx-auto">
+          <Users className="w-10 h-10 text-on-surface-variant/40 mx-auto mb-3" />
+          <h3 className="font-headline-md text-headline-md text-on-surface">No Prospects Found</h3>
+          <p className="text-body-md text-on-surface-variant mt-1">
             {searchQuery || selectedStatus !== 'ALL'
               ? 'Try adjusting your search criteria or status filter.'
               : 'Get started by creating your first sales prospect.'}
           </p>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="mt-4 inline-flex items-center gap-2 bg-indigo-600 text-white text-xs font-semibold px-4 py-2 rounded-lg"
+            className="mt-4 inline-flex items-center gap-2 bg-secondary-container text-on-secondary-container font-label-md px-4 py-2 rounded-lg"
           >
             <Plus className="w-4 h-4" />
             <span>Add Prospect</span>
           </button>
         </div>
       ) : viewMode === 'kanban' ? (
-        /* ================= KANBAN BOARD VIEW ================= */
+        /* KANBAN BOARD VIEW */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
           {KANBAN_STAGES.map((stage) => {
             const stageProspects = filteredProspects.filter((p) => p.status === stage);
@@ -237,16 +290,14 @@ export const ProspectsPage: React.FC = () => {
             return (
               <div
                 key={stage}
-                className="bg-slate-100/70 border border-slate-200 rounded-xl p-3 flex flex-col min-h-[500px]"
+                className="bg-surface-container-low border border-outline-variant rounded-xl p-stack-md flex flex-col min-h-[500px]"
               >
                 {/* Stage Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-3 px-1">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${stageInfo.badge}`}>
-                      {stageInfo.label}
-                    </span>
-                  </div>
-                  <span className="text-xs font-semibold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+                <div className="flex items-center justify-between pb-stack-sm border-b border-outline-variant mb-stack-sm px-1">
+                  <span className={`text-label-md font-label-md uppercase tracking-wider px-2 py-0.5 rounded border ${stageInfo.badge}`}>
+                    {stageInfo.label}
+                  </span>
+                  <span className="text-label-md font-label-md text-on-surface-variant bg-surface-container-lowest border border-outline-variant px-2 py-0.5 rounded-full">
                     {stageProspects.length}
                   </span>
                 </div>
@@ -256,25 +307,25 @@ export const ProspectsPage: React.FC = () => {
                   {stageProspects.map((prospect) => (
                     <div
                       key={prospect.prospect_id}
-                      className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition space-y-3"
+                      className="bg-surface-container-lowest p-stack-md rounded-lg border border-outline-variant shadow-sm hover:shadow-md transition space-y-stack-sm"
                     >
                       <div>
-                        <h4 className="font-bold text-xs text-slate-800 line-clamp-1">
+                        <h4 className="font-headline-sm text-headline-sm text-primary line-clamp-1">
                           {prospect.prospect_name}
                         </h4>
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-1">
-                          <Mail className="w-3 h-3 text-slate-400" />
+                        <div className="flex items-center gap-1.5 text-label-sm text-on-surface-variant mt-0.5">
+                          <Mail className="w-3 h-3 text-on-surface-variant/60" />
                           <span className="truncate">{prospect.email}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
-                          <Phone className="w-3 h-3 text-slate-400" />
+                        <div className="flex items-center gap-1.5 text-label-sm text-on-surface-variant mt-0.5">
+                          <Phone className="w-3 h-3 text-on-surface-variant/60" />
                           <span>{prospect.contact_number}</span>
                         </div>
                       </div>
 
                       {/* Product Tag */}
                       {prospect.product_name && (
-                        <div className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-medium px-2 py-1 rounded">
+                        <div className="flex items-center gap-1 bg-secondary-fixed text-on-secondary-fixed text-label-sm font-label-md px-2 py-1 rounded">
                           <Package className="w-3 h-3" />
                           <span className="truncate">{prospect.product_name}</span>
                         </div>
@@ -282,24 +333,50 @@ export const ProspectsPage: React.FC = () => {
 
                       {/* Address / Location */}
                       {prospect.address && (
-                        <div className="flex items-start gap-1 text-[10px] text-slate-400">
+                        <div className="flex items-start gap-1 text-label-sm text-on-surface-variant">
                           <MapPin className="w-3 h-3 flex-shrink-0 mt-0.5" />
                           <span className="line-clamp-1">{prospect.address}</span>
                         </div>
                       )}
 
                       {/* Created Date */}
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[10px] text-slate-400">
+                      <div className="flex items-center justify-between pt-2 border-t border-outline-variant text-label-sm text-on-surface-variant">
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           <span>{new Date(prospect.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>
+
+                      <div className="flex flex-col gap-2 pt-2 border-t border-outline-variant">
+                        {prospect.status === 'NEW' && (
+                          <button
+                            onClick={() => handleReadyProspect(prospect.prospect_id)}
+                            className="w-full bg-amber-500 hover:bg-amber-600 text-white font-label-md text-label-md px-2 py-1.5 rounded transition"
+                          >
+                            Mark Ready
+                          </button>
+                        )}
+
+                        {prospect.status === 'IN_PROGRESS' && (
+                          <button
+                            onClick={() => handleOpenConversion(prospect)}
+                            className="w-full bg-secondary-container text-on-secondary-container font-label-md text-label-md px-2 py-1.5 rounded hover:bg-secondary transition"
+                          >
+                            Convert to Client
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleDeleteProspect(prospect.prospect_id)}
+                          className="w-full border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 font-label-md text-label-md px-2 py-1.5 rounded transition"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))}
-
                   {stageProspects.length === 0 && (
-                    <div className="text-center py-8 text-xs text-slate-400 border border-dashed border-slate-300 rounded-lg">
+                    <div className="text-center py-8 text-label-md text-on-surface-variant/60 border border-dashed border-outline-variant rounded-lg">
                       No prospects in {stageInfo.label}
                     </div>
                   )}
@@ -309,67 +386,90 @@ export const ProspectsPage: React.FC = () => {
           })}
         </div>
       ) : (
-        /* ================= TABLE LIST VIEW ================= */
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="px-6 py-3">Prospect / Company</th>
-                  <th className="px-6 py-3">Contact</th>
-                  <th className="px-6 py-3">Preferred Service</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3">Location</th>
-                  <th className="px-6 py-3">Created Date</th>
+        /* LIST VIEW */
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-surface-container-low border-b border-outline-variant">
+              <tr>
+                <th className="text-left p-4 font-label-md text-label-md text-on-surface-variant">Name</th>
+                <th className="text-left p-4 font-label-md text-label-md text-on-surface-variant">Contact</th>
+                <th className="text-left p-4 font-label-md text-label-md text-on-surface-variant">Product</th>
+                <th className="text-left p-4 font-label-md text-label-md text-on-surface-variant">Status</th>
+                <th className="text-left p-4 font-label-md text-label-md text-on-surface-variant">Added</th>
+                <th className="text-right p-4 font-label-md text-label-md text-on-surface-variant">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProspects.map((prospect) => (
+                <tr key={prospect.prospect_id} className="border-b border-outline-variant hover:bg-surface-container-low transition">
+                  <td className="p-4">
+                    <div className="font-body-md text-on-surface">{prospect.prospect_name}</div>
+                  </td>
+                  <td className="p-4">
+                    <div className="text-body-md text-on-surface-variant">{prospect.email}</div>
+                    <div className="text-label-sm text-on-surface-variant">{prospect.contact_number}</div>
+                  </td>
+                  <td className="p-4">
+                    <span className="text-label-md text-on-surface">{prospect.product_name || '-'}</span>
+                  </td>
+                  <td className="p-4">
+                    <span className={`inline-block px-2 py-1 rounded text-label-sm font-label-md ${STATUS_CONFIG[prospect.status].badge}`}>
+                      {STATUS_CONFIG[prospect.status].label}
+                    </span>
+                  </td>
+                  <td className="p-4 text-label-md text-on-surface-variant">
+                    {new Date(prospect.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="p-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {prospect.status === 'NEW' && (
+                        <button
+                          onClick={() => handleReadyProspect(prospect.prospect_id)}
+                          className="text-amber-700 hover:text-amber-900 font-label-md text-label-md"
+                        >
+                          Ready
+                        </button>
+                      )}
+
+                      {prospect.status === 'IN_PROGRESS' && (
+                        <button
+                          onClick={() => handleOpenConversion(prospect)}
+                          className="text-secondary-container hover:text-secondary font-label-md text-label-md"
+                        >
+                          Convert →
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleDeleteProspect(prospect.prospect_id)}
+                        className="text-rose-700 hover:text-rose-900 font-label-md text-label-md"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {filteredProspects.map((prospect) => {
-                  const statusInfo = STATUS_CONFIG[prospect.status];
-                  return (
-                    <tr key={prospect.prospect_id} className="hover:bg-slate-50/80 transition">
-                      <td className="px-6 py-3.5 font-bold text-slate-800">
-                        {prospect.prospect_name}
-                      </td>
-                      <td className="px-6 py-3.5">
-                        <div className="font-medium text-slate-700">{prospect.email}</div>
-                        <div className="text-slate-400 text-[11px]">{prospect.contact_number}</div>
-                      </td>
-                      <td className="px-6 py-3.5 text-slate-600">
-                        {prospect.product_name ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium text-[11px]">
-                            <Package className="w-3 h-3 text-slate-500" />
-                            {prospect.product_name}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 font-mono">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-3.5">
-                        <span className={`inline-block px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wider ${statusInfo.badge}`}>
-                          {statusInfo.label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3.5 text-slate-500 max-w-xs truncate">
-                        {prospect.address || prospect.geo_location || '-'}
-                      </td>
-                      <td className="px-6 py-3.5 text-slate-500">
-                        {new Date(prospect.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Add Prospect Modal */}
-      <AddProspectModal
+      {/* Modals */}
+      <AddProspectModal 
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={handleProspectCreated}
+      />
+      
+      <ConvertProspectModal
+        isOpen={showConversionModal}
+        prospect={conversionProspect}
+        onClose={() => {
+          setShowConversionModal(false);
+          setConversionProspect(null);
+        }}
+        onSuccess={handleConversionComplete}
       />
     </div>
   );

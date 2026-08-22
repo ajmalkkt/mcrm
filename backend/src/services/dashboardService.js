@@ -1,8 +1,7 @@
-import db from '../config/database.js';
-import { DASHBOARD_QUERIES } from '../constants/dashboardQueries.js';
+const db = require('../config/database');
+const { DASHBOARD_QUERIES } = require('../constants/dashboardQueries');
 
-export const fetchDashboardData = async (userId, userRole, expiryDays = 30) => {
-  // Run all dashboard sub-queries concurrently for performance
+const fetchDashboardData = async (userId, userRole, expiryDays = 30) => {
   const [metricsRes, expiringRes, followupsRes, prospectsRes] = await Promise.all([
     db.query(DASHBOARD_QUERIES.GET_METRICS, [userRole, userId, expiryDays]),
     db.query(DASHBOARD_QUERIES.GET_EXPIRING_SERVICES_FEED, [userRole, userId, expiryDays, 5]),
@@ -29,3 +28,5 @@ export const fetchDashboardData = async (userId, userRole, expiryDays = 30) => {
     }, {})
   };
 };
+
+module.exports = { fetchDashboardData };

@@ -1,4 +1,4 @@
-export const PROSPECT_QUERIES = {
+const PROSPECT_QUERIES = {
   CREATE_PROSPECT: `
     INSERT INTO Prospect (
       prospect_name,
@@ -89,10 +89,21 @@ export const PROSPECT_QUERIES = {
     RETURNING prospect_id;
   `,
 
-  // Transaction Queries for Conversion
   PROMOTE_CREATE_CLIENT_ACCOUNT: `
-    INSERT INTO Client_Account (account_id, client_name, contact_number, address, latitude, longitude)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO Client_Account (
+      account_id,
+      client_name,
+      contact_number,
+      secondary_contact_number,
+      email,
+      address,
+      city,
+      state,
+      country,
+      latitude,
+      longitude
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     RETURNING *;
   `,
   PROMOTE_CREATE_CLIENT_SERVICE: `
@@ -100,10 +111,21 @@ export const PROSPECT_QUERIES = {
     VALUES ($1, $2, $3, $4, 'ACTIVE')
     RETURNING *;
   `,
+  INSERT_DOCUMENT_STORE: `
+    INSERT INTO Document_Store (
+      entity_type,
+      entity_id,
+      file_name,
+      file_path_or_uri,
+      storage_driver
+    )
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING *;
+  `,
   PROMOTE_TRANSFER_DOCUMENTS: `
-    UPDATE Documents
-    SET account_id = $1, prospect_id = NULL
-    WHERE prospect_id = $2;
+    UPDATE Document_Store
+    SET entity_type = 'CLIENT', entity_id = $1
+    WHERE entity_type = 'PROSPECT' AND entity_id = $2;
   `,
   PROMOTE_UPDATE_PROSPECT_STATUS: `
     UPDATE Prospect
@@ -115,3 +137,5 @@ export const PROSPECT_QUERIES = {
     VALUES ($1, $2);
   `
 };
+
+module.exports = { PROSPECT_QUERIES };

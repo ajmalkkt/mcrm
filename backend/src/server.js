@@ -7,6 +7,7 @@ const { checkDbConnection, pool } = require('./config/database');
 const authRoutes = require('./routes/authRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const alertConfigRoutes = require('./routes/alertConfigRoutes');
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -23,6 +24,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/clients', clientRoutes);
 // Mount other routes (e.g., call logs, assignments, dashboard)
 app.use('/api/v1/dashboard', dashboardRoutes);
+app.use('/api/v1/alerts', alertConfigRoutes);
 // Mount Master product routes
 const masterProductRoutes = require('./routes/masterProductRoutes');
 app.use('/api/v1/master-products', masterProductRoutes);

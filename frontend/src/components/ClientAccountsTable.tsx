@@ -65,6 +65,15 @@ export const ClientAccountsTable: React.FC = () => {
     loadAccounts();
   }, [loadAccounts]);
 
+  // Listen for cross-component client updates (e.g., prospect conversion or direct create)
+  useEffect(() => {
+    const handler = (e: any) => {
+      loadAccounts();
+    };
+    window.addEventListener('clients-updated', handler as EventListener);
+    return () => window.removeEventListener('clients-updated', handler as EventListener);
+  }, [loadAccounts]);
+
   // Toggle row expand/collapse
   const toggleExpand = (accountId: string) => {
     setExpandedAccountIds((prev) => {

@@ -1,18 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Prospect , ConvertProspectPayload} from '../../types/prospect';
-import { prospectsApi} from '../../api/prospects';
-import { 
-  Building2, 
-  X, 
-  CheckCircle2, 
-  AlertCircle, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Globe, 
-  UserCheck,
-  Hash
-} from 'lucide-react';
+import { Prospect, ConvertProspectPayload } from '../../types/prospect';
+import { prospectsApi } from '../../api/prospects';
+import { Building2, X, CheckCircle2, AlertCircle, Mail, Phone, MapPin, Globe, UserCheck, Hash, FileText } from 'lucide-react';
 
 interface ConvertProspectModalProps {
   isOpen: boolean;
@@ -27,6 +16,8 @@ export const ConvertProspectModal: React.FC<ConvertProspectModalProps> = ({
   onClose,
   onSuccess
 }) => {
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+
   const [formData, setFormData] = useState<ConvertProspectPayload>({
     account_id: '',
     client_name: '',
@@ -38,7 +29,8 @@ export const ConvertProspectModal: React.FC<ConvertProspectModalProps> = ({
     state: '',
     country: '',
     latitude: null,
-    longitude: null
+    longitude: null,
+    documents: []
   });
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -58,7 +50,7 @@ export const ConvertProspectModal: React.FC<ConvertProspectModalProps> = ({
       }
 
       setFormData({
-        account_id: `ACC-${Math.floor(100000 + Math.random() * 900000)}`, // Auto-suggested ID
+        account_id: '',
         client_name: prospect.prospect_name || '',
         contact_number: prospect.contact_number || '',
         secondary_contact_number: '',
@@ -68,7 +60,8 @@ export const ConvertProspectModal: React.FC<ConvertProspectModalProps> = ({
         state: (prospect as any).state || '',
         country: (prospect as any).country || '',
         latitude: lat,
-        longitude: lng
+        longitude: lng,
+        documents: []
       });
       setError(null);
     }
@@ -88,15 +81,25 @@ export const ConvertProspectModal: React.FC<ConvertProspectModalProps> = ({
     }));
   };
 
+  const handleDocumentsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = Array.from(event.target.files || []);
+    setUploadedFiles(fileList);
+    setFormData((prev) => ({
+      ...prev,
+      documents: fileList
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.account_id.trim()) {
-      setError('Business Account Number (account_id) is required.');
-      return;
-    }
     if (!formData.client_name.trim() || !formData.email.trim() || !formData.contact_number.trim()) {
       setError('Client name, primary contact number, and email are required.');
+      return;
+    }
+
+    if (!uploadedFiles || uploadedFiles.length === 0) {
+      setError('At least one supporting document is required before converting the prospect.');
       return;
     }
 
@@ -104,16 +107,24 @@ export const ConvertProspectModal: React.FC<ConvertProspectModalProps> = ({
       setIsSubmitting(true);
       setError(null);
 
-      const response = await prospectsApi.convertProspect(prospect.prospect_id, formData);
+      const response = await prospectsApi.convertProspect(prospect.prospect_id, {
+        ...formData,
+        documents: uploadedFiles,
+        account_id: formData.account_id && formData.account_id.trim() ? formData.account_id.trim() : undefined,
+      });
 
       if (response.success) {
-        onSuccess(prospect.prospect_id, response.data.account_id);
+        const accountId = response.data?.account?.account_id || response.data?.account_id || response.account_id || 'AUTO';
+        onSuccess(prospect.prospect_id, accountId);
+        try {
+          window.dispatchEvent(new CustomEvent('clients-updated', { detail: { accountId } }));
+        } catch (e) {
+          // ignore if window not available
+        }
         onClose();
       }
     } catch (err: any) {
-      setError(
-        err.response?.data?.message || err.message || 'Failed to convert prospect to client account.'
-      );
+      setError(err.response?.data?.message || err.message || 'Failed to convert prospect to client account.');
     } finally {
       setIsSubmitting(false);
     }
@@ -153,49 +164,31 @@ export const ConvertProspectModal: React.FC<ConvertProspectModalProps> = ({
             </div>
           )}
 
-          {/* Account Identifiers */}
           <div className="space-y-3">
-            <h4 className="font-bold text-slate-700 text-[10px] uppercase tracking-wider">
-              1. Account Identification
-            </h4>
-
+            <h4 className="font-bold text-slate-700 text-[10px] uppercase tracking-wider">1. Account Identification</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Business Account Number (ID) <span className="text-rose-500">*</span>
-                </label>
+                <label className="block font-bold text-slate-700 mb-1">Business Account Number (ID)</label>
                 <div className="relative">
                   <Hash className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    name="account_id"
-                    value={formData.account_id}
-                    onChange={handleChange}
-                    required
-                    placeholder="e.g. ACC-100293"
-                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                  />
+                  <input type="text" name="account_id" value={formData.account_id || ''} onChange={handleChange} placeholder="ACC-1001" className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono" />
                 </div>
+                <p className="mt-1 text-[10px] text-slate-500">* ID is subject to availability and the next available number will be assigned if the chosen ID is already taken.</p>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Client Name <span className="text-rose-500">*</span>
-                </label>
+                <label className="block font-bold text-slate-700 mb-1">Client Name <span className="text-rose-500">*</span></label>
                 <div className="relative">
                   <Building2 className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    name="client_name"
-                    value={formData.client_name}
-                    onChange={handleChange}
-                    required
-                    placeholder="Client Company Name"
-                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
+                  <input type="text" name="client_name" value={formData.client_name} onChange={handleChange} required placeholder="Client Company Name" className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Selected service</div>
+            <div className="mt-1 text-sm font-semibold text-emerald-900">{prospect.preferred_product_name || prospect.product_name || 'No product selected'} / {prospect.preferred_plan_name || 'No plan selected'}</div>
           </div>
 
           <hr className="border-slate-100 my-2" />
@@ -353,21 +346,22 @@ export const ConvertProspectModal: React.FC<ConvertProspectModalProps> = ({
             </div>
           </div>
 
-          {/* Form Actions */}
+          <hr className="border-slate-100 my-2" />
+
+          <div className="space-y-3">
+            <h4 className="font-bold text-slate-700 text-[10px] uppercase tracking-wider">4. Supporting Documents (Required)</h4>
+            <label className="flex cursor-pointer items-center justify-between rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 hover:bg-slate-100">
+              <div className="flex items-center gap-2 text-slate-600">
+                <FileText className="w-4 h-4" />
+                <span>{formData.documents && formData.documents.length > 0 ? `${formData.documents.length} file(s) selected` : 'Upload documents'}</span>
+              </div>
+              <input type="file" multiple onChange={handleDocumentsChange} className="hidden" />
+            </label>
+          </div>
+
           <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition font-semibold shadow-sm disabled:opacity-50"
-            >
+            <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition font-semibold">Cancel</button>
+            <button type="submit" disabled={isSubmitting} className="inline-flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition font-semibold shadow-sm disabled:opacity-50">
               <CheckCircle2 className="w-4 h-4" />
               <span>{isSubmitting ? 'Converting...' : 'Convert to Client Account'}</span>
             </button>

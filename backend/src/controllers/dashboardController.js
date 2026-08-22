@@ -1,6 +1,6 @@
-import { fetchDashboardData } from '../services/dashboardService.js';
+const { fetchDashboardData } = require('../services/dashboardService');
 
-export const getDashboardOverview = async (req, res) => {
+const getDashboardOverview = async (req, res) => {
   try {
     const userId = req.user.user_id;
     const userRole = req.user.role;
@@ -21,3 +21,5 @@ export const getDashboardOverview = async (req, res) => {
     });
   }
 };
+
+module.exports = { getDashboardOverview };

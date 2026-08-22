@@ -1,5 +1,4 @@
-export const masterProductQueries = {
-  // Product Queries
+const masterProductQueries = {
   GET_ALL_PRODUCTS: `
     SELECT 
       product_id,
@@ -17,7 +16,6 @@ export const masterProductQueries = {
     WHERE product_id = $1;
   `,
 
-  // Plan Queries
   GET_ALL_PLANS: `
     SELECT 
       sp.plan_id,
@@ -44,3 +42,5 @@ export const masterProductQueries = {
     ORDER BY plan_name ASC;
   `
 };
+
+module.exports = { masterProductQueries };

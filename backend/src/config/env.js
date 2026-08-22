@@ -35,11 +35,20 @@ const config = {
   storage: {
     driver: process.env.STORAGE_DRIVER || 'LOCAL',
     localDir: process.env.LOCAL_UPLOAD_DIR || './uploads',
+    maxFileSizeMb: parseInt(process.env.MAX_UPLOAD_FILE_SIZE_MB || '50', 10),
     s3: {
       region: process.env.AWS_REGION,
       bucket: process.env.AWS_S3_BUCKET_NAME,
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      endpoint: process.env.AWS_S3_ENDPOINT,
+    },
+    azure: {
+      connectionString: process.env.AZURE_STORAGE_CONNECTION_STRING,
+      accountName: process.env.AZURE_STORAGE_ACCOUNT_NAME,
+      accountKey: process.env.AZURE_STORAGE_ACCOUNT_KEY,
+      containerName: process.env.AZURE_STORAGE_CONTAINER_NAME || 'documents',
+      blobEndpoint: process.env.AZURE_STORAGE_BLOB_ENDPOINT,
     },
   },
 };

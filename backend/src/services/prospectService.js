@@ -1,8 +1,7 @@
-// src/services/prospectService.js
-import db from '../config/database.js';
-import { PROSPECT_QUERIES } from '../constants/prospectQueries.js';
+const db = require('../config/database');
+const { PROSPECT_QUERIES } = require('../constants/prospectQueries');
 
-export const createProspect = async (data) => {
+const createProspect = async (data) => {
   const values = [
     data.prospect_name,
     data.contact_number,
@@ -21,7 +20,7 @@ export const createProspect = async (data) => {
   return rows[0];
 };
 
-export const getProspects = async ({ status, search } = {}) => {
+const getProspects = async ({ status, search } = {}) => {
   const searchPattern = search ? `%${search}%` : null;
   const { rows } = await db.query(PROSPECT_QUERIES.GET_ALL_PROSPECTS, [
     status || null,
@@ -30,12 +29,12 @@ export const getProspects = async ({ status, search } = {}) => {
   return rows;
 };
 
-export const getProspectById = async (prospectId) => {
+const getProspectById = async (prospectId) => {
   const { rows } = await db.query(PROSPECT_QUERIES.GET_PROSPECT_BY_ID, [prospectId]);
   return rows[0] || null;
 };
 
-export const updateProspect = async (prospectId, data) => {
+const updateProspect = async (prospectId, data) => {
   const values = [
     prospectId,
     data.prospect_name || null,
@@ -55,7 +54,15 @@ export const updateProspect = async (prospectId, data) => {
   return rows[0] || null;
 };
 
-export const deleteProspect = async (prospectId) => {
+const deleteProspect = async (prospectId) => {
   const { rows } = await db.query(PROSPECT_QUERIES.DELETE_PROSPECT, [prospectId]);
   return rows[0] || null;
+};
+
+module.exports = {
+  createProspect,
+  getProspects,
+  getProspectById,
+  updateProspect,
+  deleteProspect,
 };

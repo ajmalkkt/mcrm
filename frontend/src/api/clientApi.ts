@@ -19,12 +19,21 @@ export interface GetClientsResponse {
 export const fetchClientAccounts = async (
   params?: GetClientsParams
 ): Promise<ClientAccount[]> => {
-  const response = await apiClient.get<GetClientsResponse>('/api/v1/clients', {
+  const response = await apiClient.get<GetClientsResponse>('/clients', {
     params: {
       ...(params?.search ? { search: params.search } : {}),
       ...(params?.status && params.status !== 'ALL' ? { status: params.status } : {}),
     },
   });
 
+  return response.data.data;
+};
+
+/**
+ * Create new client account
+ * Endpoint: POST /api/v1/clients
+ */
+export const createClientAccount = async (payload: Partial<ClientAccount>): Promise<ClientAccount> => {
+  const response = await apiClient.post('/clients', payload);
   return response.data.data;
 };

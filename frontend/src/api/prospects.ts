@@ -9,6 +9,34 @@ import {
   ProspectListResponse
 } from '../types/prospect';
 
+const buildMultipartForm = (payload: CreateProspectDTO | ConvertProspectPayload) => {
+  const formData = new FormData();
+
+  const appendValue = (key: string, value: unknown) => {
+    if (value === undefined || value === null || value === '') return;
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      formData.append(key, String(value));
+      return;
+    }
+    if (Array.isArray(value)) {
+      formData.append(key, JSON.stringify(value));
+      return;
+    }
+    formData.append(key, JSON.stringify(value));
+  };
+
+  Object.entries(payload).forEach(([key, value]) => {
+    if (key === 'documents') {
+      const files = Array.isArray(value) ? value.filter((item) => item instanceof File) : [];
+      files.forEach((file) => formData.append('documents', file));
+      return;
+    }
+    appendValue(key, value);
+  });
+
+  return formData;
+};
+
 export const prospectsApi = {
   getProspects: async (status?: string): Promise<ProspectListResponse> => {
     const response = await apiClient.get('/prospects', { params: { status } });
@@ -21,7 +49,9 @@ export const prospectsApi = {
   },
 
   createProspect: async (payload: CreateProspectDTO): Promise<{ success: boolean; data: Prospect }> => {
-    const response = await apiClient.post('/prospects', payload);
+    const hasFiles = Array.isArray(payload.documents) && payload.documents.some((doc) => doc instanceof File);
+    const request = hasFiles ? buildMultipartForm(payload) : payload;
+    const response = await apiClient.post('/prospects', request, hasFiles ? { headers: { 'Content-Type': 'multipart/form-data' } } : {});
     return response.data;
   },
 
@@ -42,8 +72,12 @@ export const prospectsApi = {
   },
 
   convertProspect: async (prospectId: string, payload: ConvertProspectPayload): Promise<ConvertProspectResponse> => {
+    const hasFiles = Array.isArray(payload.documents) && payload.documents.some((doc) => doc instanceof File);
+    const request = hasFiles ? buildMultipartForm(payload) : payload;
     const response = await apiClient.post<ConvertProspectResponse>(
-    `/prospects/${prospectId}/convert`, payload
+      `/prospects/${prospectId}/convert`,
+      request,
+      hasFiles ? { headers: { 'Content-Type': 'multipart/form-data' } } : {}
     );
     return response.data;
   }

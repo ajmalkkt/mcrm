@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { X, User, Mail, Phone, MapPin, CheckCircle2, AlertCircle } from 'lucide-react';
-import { ProductPlanSelector } from '../common/ProductPlanSelector';
+import React, { useEffect, useState } from 'react';
+import { X, User, Mail, Phone, MapPin, CheckCircle2, AlertCircle, FileText, Plus, Trash2 } from 'lucide-react';
+import { apiClient } from '../../api/client';
 import { prospectsApi } from '../../api/prospects';
 import { Prospect } from '../../types/prospect';
 
@@ -8,6 +8,23 @@ interface AddProspectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (newProspect: Prospect) => void;
+}
+
+interface ProductOption {
+  product_id: string;
+  product_name: string;
+}
+
+interface ServicePlanOption {
+  plan_id: string;
+  plan_name: string;
+  billing_cycle: string;
+}
+
+interface ServiceRow {
+  id: number;
+  productId: string;
+  planId: string;
 }
 
 export const AddProspectModal: React.FC<AddProspectModalProps> = ({
@@ -23,37 +40,82 @@ export const AddProspectModal: React.FC<AddProspectModalProps> = ({
     city: '',
     state: '',
     country: '',
-    geo_location: '',
-    preferred_product_id: '',
-    preferred_plan_id: ''
+    geo_location: ''
   });
-
+  const [serviceRows, setServiceRows] = useState<ServiceRow[]>([{ id: Date.now(), productId: '', planId: '' }]);
+  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [plansByProduct, setPlansByProduct] = useState<Record<string, ServicePlanOption[]>>({});
+  const [documents, setDocuments] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const loadProducts = async () => {
+      try {
+        setLoadingProducts(true);
+        const response = await apiClient.get<{ data: ProductOption[] }>('/master-products');
+        setProducts(response.data.data || []);
+      } catch (err) {
+        console.error('Failed to load products', err);
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+
+    loadProducts();
+  }, [isOpen]);
+
+  const fetchPlans = async (productId: string) => {
+    if (!productId) return [];
+    if (plansByProduct[productId]) return plansByProduct[productId];
+
+    try {
+      setLoadingPlans(true);
+      const response = await apiClient.get<{ data: ServicePlanOption[] }>(`/master-products/${productId}/plans`);
+      const nextPlans = response.data.data || [];
+      setPlansByProduct((prev) => ({ ...prev, [productId]: nextPlans }));
+      return nextPlans;
+    } catch (err) {
+      console.error('Failed to fetch plans', err);
+      return [];
+    } finally {
+      setLoadingPlans(false);
+    }
+  };
 
   if (!isOpen) return null;
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Handlers specifically for the ProductPlanSelector
-  const handleProductChange = (productId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      preferred_product_id: productId,
-      preferred_plan_id: '' // Clear plan when product changes
+  const addServiceRow = () => {
+    setServiceRows((prev) => [...prev, { id: Date.now() + Math.random(), productId: '', planId: '' }]);
+  };
+
+  const removeServiceRow = (id: number) => {
+    setServiceRows((prev) => {
+      if (prev.length === 1) return prev;
+      return prev.filter((row) => row.id !== id);
+    });
+  };
+
+  const updateServiceRow = (id: number, field: 'productId' | 'planId', value: string) => {
+    setServiceRows((prev) => prev.map((row) => {
+      if (row.id !== id) return row;
+      if (field === 'productId') return { ...row, productId: value, planId: '' };
+      return { ...row, planId: value };
     }));
   };
 
-  const handlePlanChange = (planId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      preferred_plan_id: planId
-    }));
+  const handleDocumentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = Array.from(event.target.files || []);
+    setDocuments(fileList);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,11 +126,12 @@ export const AddProspectModal: React.FC<AddProspectModalProps> = ({
       return;
     }
 
+    const primarySelection = serviceRows.find((row) => row.productId && row.planId) || serviceRows[0];
+
     try {
       setIsSubmitting(true);
       setError(null);
 
-      // Submit to backend
       const response = await prospectsApi.createProspect({
         prospect_name: formData.prospect_name,
         contact_number: formData.contact_number,
@@ -78,8 +141,13 @@ export const AddProspectModal: React.FC<AddProspectModalProps> = ({
         state: formData.state,
         country: formData.country,
         geo_location: formData.geo_location,
-        preferred_product_id: formData.preferred_product_id || 'null',
-        preferred_plan_id: formData.preferred_plan_id || 'null'
+        preferred_product_id: primarySelection?.productId || undefined,
+        preferred_plan_id: primarySelection?.planId || undefined,
+        documents: documents.length > 0 ? documents : undefined,
+        service_preferences: serviceRows.filter((row) => row.productId && row.planId).map((row) => ({
+          product_id: row.productId,
+          plan_id: row.planId
+        }))
       });
 
       onSuccess(response.data);
@@ -183,20 +251,44 @@ export const AddProspectModal: React.FC<AddProspectModalProps> = ({
 
           <hr className="border-slate-100 my-2" />
 
-          {/* Section 2: Product & Plan Selection */}
           <div className="space-y-3">
-            <h4 className="font-bold text-slate-700 text-[10px] uppercase tracking-wider">
-              2. Product & Service Plan Preference
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-slate-700 text-[10px] uppercase tracking-wider">2. Product & Service Plan Preference</h4>
+              <button type="button" onClick={addServiceRow} className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800">
+                <Plus className="w-3.5 h-3.5" /> Add Product
+              </button>
+            </div>
 
-            {/* Integrated ProductPlanSelector */}
-            <ProductPlanSelector
-              selectedProductId={formData.preferred_product_id}
-              selectedPlanId={formData.preferred_plan_id}
-              onProductChange={handleProductChange}
-              onPlanChange={handlePlanChange}
-              disabled={isSubmitting}
-            />
+            <div className="space-y-3">
+              {serviceRows.map((row) => {
+                const planOptions = row.productId ? plansByProduct[row.productId] || [] : [];
+                return (
+                  <div key={row.id} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-end bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Product</label>
+                      <select value={row.productId} onChange={async (e) => { const productId = e.target.value; updateServiceRow(row.id, 'productId', productId); if (productId) await fetchPlans(productId); }} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" disabled={loadingProducts}>
+                        <option value="">Select product</option>
+                        {products.map((product) => <option key={product.product_id} value={product.product_id}>{product.product_name}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Plan</label>
+                      <select value={row.planId} onChange={(e) => updateServiceRow(row.id, 'planId', e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" disabled={!row.productId || loadingPlans}>
+                        <option value="">{!row.productId ? 'Select product first' : 'Select plan'}</option>
+                        {planOptions.map((plan) => <option key={plan.plan_id} value={plan.plan_id}>{plan.plan_name} ({plan.billing_cycle})</option>)}
+                      </select>
+                    </div>
+
+                    {serviceRows.length > 1 && (
+                      <button type="button" onClick={() => removeServiceRow(row.id)} className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <hr className="border-slate-100 my-2" />
@@ -261,23 +353,24 @@ export const AddProspectModal: React.FC<AddProspectModalProps> = ({
             </div>
           </div>
 
-          {/* Form Actions */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition font-semibold shadow-sm disabled:opacity-50"
-            >
+          <hr className="border-slate-100 my-2" />
+
+          <div className="space-y-3">
+            <h4 className="font-bold text-slate-700 text-[10px] uppercase tracking-wider">4. Supporting Documents (Optional)</h4>
+            <label className="flex cursor-pointer items-center justify-between rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 hover:bg-slate-100">
+              <div className="flex items-center gap-2 text-slate-600">
+                <FileText className="w-4 h-4" />
+                <span>{documents.length > 0 ? `${documents.length} file(s) selected` : 'Upload documents'}</span>
+              </div>
+              <input type="file" multiple onChange={handleDocumentChange} className="hidden" />
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+            <button type="button" onClick={onClose} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition">Cancel</button>
+            <button type="submit" disabled={isSubmitting} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition disabled:opacity-60">
               <CheckCircle2 className="w-4 h-4" />
-              <span>{isSubmitting ? 'Saving...' : 'Create Prospect'}</span>
+              {isSubmitting ? 'Saving...' : 'Save Prospect'}
             </button>
           </div>
         </form>

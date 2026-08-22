@@ -23,6 +23,10 @@ apiClient.interceptors.response.use(
   (error) => {
     const message = error.response?.data?.message || error.message || 'An unexpected error (Network/Server down) occurred';
     console.error('Backend Error:', message);
-    return Promise.reject(new Error(message));
+    return Promise.reject({
+      ...error,
+      message,
+      response: error.response,
+    });
   }
 );

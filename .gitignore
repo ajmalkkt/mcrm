@@ -6,3 +6,5 @@
 *password*
 **.secret
 *node_modules/
+dist/
+build/

@@ -35,106 +35,149 @@ export const DashboardPage: React.FC = () => {
   const isManagement = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 bg-slate-50 min-h-screen">
-      {/* Role & Greeting Banner */}
-      {user && (
-        <RoleBadge role={user.role} user={user} />
-      )}
-
-      {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="p-margin-desktop bg-background flex-1">
+      {/* Page Header */}
+      <div className="flex items-center justify-between mb-stack-lg">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">
-            {isManagement ? 'Management Overview' : 'My Workstation Summary'}
-          </h1>
-          <p className="text-xs text-slate-500">
+          <h2 className="font-display-lg text-display-lg text-primary">
+            {isManagement ? 'Command Center' : 'My Daily Focus'}
+          </h2>
+          <p className="text-body-lg text-on-surface-variant mt-1">
             {isManagement 
-              ? 'Real-time service lifecycle and agent performance indicators.' 
-              : 'Your active accounts, upcoming service expirations, and calls.'}
+              ? 'High-level management overview and pending actions.' 
+              : 'Review your urgent tasks and daily metrics to prioritize your workflow.'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <label htmlFor="expiryFilter" className="text-xs font-semibold text-slate-600">
-            Expiry Window:
-          </label>
-          <select
-            id="expiryFilter"
-            value={expiryDays}
-            onChange={(e) => setExpiryDays(Number(e.target.value))}
-            className="text-sm bg-white border border-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-          >
-            <option value={7}>Next 7 Days</option>
-            <option value={15}>Next 15 Days</option>
-            <option value={30}>Next 30 Days</option>
-            <option value={60}>Next 60 Days</option>
-          </select>
+        <div className="flex gap-3">
+          <button className="bg-surface-container border border-outline-variant text-on-surface px-4 py-2 rounded-lg font-label-md text-label-md flex items-center gap-2 hover:bg-surface-container-high transition-colors">
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>download</span>
+            Export Report
+          </button>
+          <button className="bg-primary-container text-on-primary font-label-md text-label-md px-4 py-2 rounded-lg hover:bg-primary transition-colors shadow-sm flex items-center gap-2">
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add</span>
+            New Account
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Widgets (Bento-style Grid) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter mb-stack-lg">
+        {/* Widget 1: Total Active Services */}
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-md shadow-[0px_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden group hover:border-secondary transition-colors">
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#10B981]"></div>
+          <div className="flex justify-between items-start mb-4 pl-2">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface-variant">Total Active Services</p>
+              <h3 className="font-display-lg text-display-lg text-primary mt-1">{data?.summary?.activeServices ?? 0}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-[#10B981]/10 flex items-center justify-center text-[#10B981]">
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>router</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 pl-2 font-label-sm text-label-sm text-[#10B981]">
+            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>trending_up</span>
+            <span>+4.2% from last month</span>
+          </div>
+        </div>
+
+        {/* Widget 2: Expiring Contracts */}
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-md shadow-[0px_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden group hover:border-error transition-colors">
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-error"></div>
+          <div className="flex justify-between items-start mb-4 pl-2">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface-variant">Expiring (30 Days)</p>
+              <h3 className="font-display-lg text-display-lg text-primary mt-1">{data?.summary?.expiringServices ?? 0}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-error-container flex items-center justify-center text-on-error-container">
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>warning</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 pl-2 font-label-sm text-label-sm text-error">
+            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>trending_up</span>
+            <span>+12 pending renewal</span>
+          </div>
+        </div>
+
+        {/* Widget 3: Team Follow-ups Due */}
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-md shadow-[0px_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden group hover:border-secondary transition-colors">
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#F59E0B]"></div>
+          <div className="flex justify-between items-start mb-4 pl-2">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface-variant">Follow-ups Due Today</p>
+              <h3 className="font-display-lg text-display-lg text-primary mt-1">{data?.summary?.pendingFollowups ?? 0}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-[#F59E0B]/10 flex items-center justify-center text-[#F59E0B]">
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>assignment_late</span>
+            </div>
+          </div>
+          <div className="w-full bg-surface-container h-1.5 rounded-full mt-2 ml-2">
+            <div className="bg-[#F59E0B] h-1.5 rounded-full" style={{ width: '65%' }}></div>
+          </div>
+        </div>
+
+        {/* Widget 4: Unassigned Prospects */}
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-stack-md shadow-[0px_4px_12px_rgba(0,0,0,0.05)] relative overflow-hidden group hover:border-secondary transition-colors">
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-secondary-container"></div>
+          <div className="flex justify-between items-start mb-4 pl-2">
+            <div>
+              <p className="font-label-md text-label-md text-on-surface-variant">Unassigned Prospects</p>
+              <h3 className="font-display-lg text-display-lg text-primary mt-1">{data?.summary?.openProspects ?? 0}</h3>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed">
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>person_add</span>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Loading & Error States */}
       {loading ? (
         <div className="flex items-center justify-center min-h-[300px]">
-          <div className="flex items-center gap-3 text-slate-500">
-            <svg className="w-6 h-6 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <span className="font-medium text-sm">Loading dashboard analytics...</span>
+          <div className="flex items-center gap-3 text-on-surface-variant">
+            <div className="w-6 h-6 animate-spin text-primary border-2 border-primary-container rounded-full border-t-primary"></div>
+            <span className="font-body-md text-body-md">Loading dashboard analytics...</span>
           </div>
         </div>
       ) : error ? (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 flex items-center justify-between">
-          <span className="text-sm font-medium">{error}</span>
+        <div className="p-4 bg-error-container border border-error rounded-lg text-on-error-container flex items-center justify-between">
+          <span className="font-body-md text-body-md font-medium">{error}</span>
           <button
             onClick={() => fetchData(expiryDays)}
-            className="px-3 py-1 bg-rose-600 text-white text-xs font-semibold rounded hover:bg-rose-700 transition"
+            className="px-3 py-1 bg-error text-on-error text-label-md font-label-md rounded hover:opacity-90 transition"
           >
             Retry
           </button>
         </div>
       ) : (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              title={isManagement ? "Total Active Services" : "My Active Services"}
-              value={data?.summary?.activeServices ?? 0}
-              icon={
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              }
-              color="emerald"
-            />
-            <StatCard
-              title="Expiring Contracts"
-              value={data?.summary?.expiringServices ?? 0}
-              subtitle={`Within ${expiryDays} days`}
-              icon={
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              }
-              color="amber"
-            />
-            <StatCard
-              title={isManagement ? "Team Follow-ups Due" : "My Pending Follow-ups"}
-              value={data?.summary?.pendingFollowups ?? 0}
-              icon={
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              }
-              color="rose"
-            />
-            <StatCard
-              title="Unassigned Prospects"
-              value={data?.summary?.openProspects ?? 0}
-              icon={
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              }
-              color="indigo"
-            />
-          </div>
+          {/* Main Split Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+            {/* Left Column (Wider): Expiring Services List */}
+            <div className="lg:col-span-2 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.05)] flex flex-col">
+              <div className="p-stack-md border-b border-outline-variant flex justify-between items-center">
+                <h3 className="font-headline-md text-headline-md text-primary">Expiring Services Action Required</h3>
+                <button className="text-secondary font-label-md text-label-md hover:underline">View All ({data?.summary?.expiringServices || 0})</button>
+              </div>
+              <div className="overflow-x-auto flex-1">
+                <ExpiringServicesTable items={data?.alerts?.expiringServices || []} expiryDays={expiryDays} />
+              </div>
+            </div>
 
-          {/* Feeds Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ExpiringServicesTable items={data?.alerts?.expiringServices || []} expiryDays={expiryDays} />
-            <PendingFollowupsTable items={data?.alerts?.pendingFollowups || []} />
+            {/* Right Column (Narrower): Pending Team Follow-ups */}
+            <div className="lg:col-span-1 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-[0px_4px_12px_rgba(0,0,0,0.05)] flex flex-col">
+              <div className="p-stack-md border-b border-outline-variant flex justify-between items-center">
+                <h3 className="font-headline-sm text-headline-sm text-primary">Team Follow-ups</h3>
+                <button className="text-on-surface-variant hover:text-primary transition-colors">
+                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>filter_list</span>
+                </button>
+              </div>
+              <div className="p-stack-sm flex-1 overflow-y-auto">
+                <PendingFollowupsTable items={data?.alerts?.pendingFollowups || []} />
+              </div>
+              <div className="p-stack-sm border-t border-outline-variant text-center">
+                <button className="text-secondary font-label-md text-label-md hover:underline w-full py-1">View All Follow-ups</button>
+              </div>
+            </div>
           </div>
         </>
       )}

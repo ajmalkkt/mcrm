@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS Master_Product (
     product_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
     product_name VARCHAR(100) NOT NULL UNIQUE,
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS Master_Service_Plan (
@@ -42,7 +43,8 @@ CREATE TABLE IF NOT EXISTS Master_Service_Plan (
     product_id VARCHAR(36) REFERENCES Master_Product(product_id) ON DELETE RESTRICT,
     plan_name VARCHAR(100) NOT NULL,
     billing_cycle VARCHAR(20) DEFAULT 'MONTHLY',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =========================================================
@@ -61,14 +63,16 @@ CREATE TABLE IF NOT EXISTS Prospect (
     preferred_product_id VARCHAR(36) REFERENCES Master_Product(product_id),
     preferred_plan_id VARCHAR(36) REFERENCES Master_Service_Plan(plan_id),
     status VARCHAR(20) DEFAULT 'NEW', -- NEW, IN_PROGRESS, CONVERTED, REJECTED
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =========================================================
 -- 3. Verified Client Accounts & Subscribed Services
 -- =========================================================
 CREATE TABLE IF NOT EXISTS Client_Account (
-    account_id VARCHAR(50) PRIMARY KEY, -- Business Account Number
+    account_id VARCHAR(50) PRIMARY KEY,
+    client_code VARCHAR(50) UNIQUE, -- Optional unique code for internal reference
     client_name VARCHAR(150) NOT NULL,
     contact_number VARCHAR(20) NOT NULL,
     secondary_contact_number VARCHAR(20),
@@ -79,7 +83,18 @@ CREATE TABLE IF NOT EXISTS Client_Account (
     country VARCHAR(100),
     latitude DECIMAL(10, 8),
     longitude DECIMAL(11, 8),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS Alert_Configuration (
+    alert_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    renewal_warning_days INTEGER NOT NULL DEFAULT 15,
+    expiry_warning_days INTEGER NOT NULL DEFAULT 7,
+    followup_reminder_days INTEGER NOT NULL DEFAULT 10,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS Client_Service (
@@ -89,7 +104,8 @@ CREATE TABLE IF NOT EXISTS Client_Service (
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
     status service_status DEFAULT 'PENDING_PROVISION', -- ACTIVE, EXPIRED, TERMINATED
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =========================================================
@@ -102,7 +118,8 @@ CREATE TABLE IF NOT EXISTS Document_Store (
     file_name VARCHAR(255) NOT NULL,
     file_path_or_uri TEXT NOT NULL,
     storage_driver VARCHAR(20) DEFAULT 'LOCAL', -- 'LOCAL', 'S3', 'BLOB'
-    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =========================================================
@@ -115,7 +132,8 @@ CREATE TABLE IF NOT EXISTS Assignment_Rule (
     target_id VARCHAR(50) NOT NULL, -- account_id or client_service_id
     --account_id INT REFERENCES client_account(account_id) ON DELETE CASCADE,
     --client_service_id INT REFERENCES client_service(client_service_id) ON DELETE CASCADE,
-    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =========================================================
@@ -131,8 +149,84 @@ CREATE TABLE IF NOT EXISTS Interaction_Call_Log (
     remarks TEXT,
     requires_followup BOOLEAN DEFAULT FALSE,
     followup_date TIMESTAMP WITH TIME ZONE NULL,
-    is_closed BOOLEAN DEFAULT FALSE
+    is_closed BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'set_updated_at_master_product'
+    ) THEN
+        CREATE TRIGGER set_updated_at_master_product
+        BEFORE UPDATE ON Master_Product
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'set_updated_at_master_service_plan'
+    ) THEN
+        CREATE TRIGGER set_updated_at_master_service_plan
+        BEFORE UPDATE ON Master_Service_Plan
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'set_updated_at_prospect'
+    ) THEN
+        CREATE TRIGGER set_updated_at_prospect
+        BEFORE UPDATE ON Prospect
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'set_updated_at_client_account'
+    ) THEN
+        CREATE TRIGGER set_updated_at_client_account
+        BEFORE UPDATE ON Client_Account
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'set_updated_at_client_service'
+    ) THEN
+        CREATE TRIGGER set_updated_at_client_service
+        BEFORE UPDATE ON Client_Service
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'set_updated_at_document_store'
+    ) THEN
+        CREATE TRIGGER set_updated_at_document_store
+        BEFORE UPDATE ON Document_Store
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'set_updated_at_assignment_rule'
+    ) THEN
+        CREATE TRIGGER set_updated_at_assignment_rule
+        BEFORE UPDATE ON Assignment_Rule
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'set_updated_at_interaction_call_log'
+    ) THEN
+        CREATE TRIGGER set_updated_at_interaction_call_log
+        BEFORE UPDATE ON Interaction_Call_Log
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+    END IF;
+END $$;
 
 -- Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_client_service_expiry ON Client_Service(end_date, status);

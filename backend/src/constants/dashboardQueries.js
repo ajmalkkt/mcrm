@@ -3,14 +3,7 @@
  * Compatible with PostgreSQL 16
  */
 
-export const DASHBOARD_QUERIES = {
-  /**
-   * Fetches core aggregate metrics based on user role and assignment scope.
-   * Parameters:
-   *  $1: userRole ('ADMIN', 'MANAGER', 'USER')
-   *  $2: userId (VARCHAR(36))
-   *  $3: expiryWindowDays (Integer - e.g., 30, 15, 7)
-   */
+const DASHBOARD_QUERIES = {
   GET_METRICS: `
     WITH accessible_services AS (
         SELECT 
@@ -30,16 +23,11 @@ export const DASHBOARD_QUERIES = {
             OR ar_srv.user_id = $2
     )
     SELECT 
-        -- Active Services Count
         COUNT(DISTINCT client_service_id) FILTER (WHERE status = 'ACTIVE') AS active_services_count,
-
-        -- FR-5.2 Expiring Service Alerts Count
         COUNT(DISTINCT client_service_id) FILTER (
             WHERE status = 'ACTIVE' 
             AND end_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + ($3 || ' days')::INTERVAL)
         ) AS expiring_services_count,
-
-        -- FR-5.3 Pending Follow-Up Alert Feed Count
         (
             SELECT COUNT(*)
             FROM Interaction_Call_Log cl
@@ -48,8 +36,6 @@ export const DASHBOARD_QUERIES = {
               AND cl.followup_date <= NOW()
               AND ($1 IN ('ADMIN', 'MANAGER') OR cl.user_id = $2)
         ) AS pending_followups_count,
-
-        -- Unconverted Prospects Count
         (
             SELECT COUNT(*)
             FROM Prospect
@@ -59,14 +45,6 @@ export const DASHBOARD_QUERIES = {
     FROM accessible_services;
   `,
 
-  /**
-   * Fetches list of expiring service contracts for the dashboard alert feed.
-   * Parameters:
-   *  $1: userRole ('ADMIN', 'MANAGER', 'USER')
-   *  $2: userId (VARCHAR(36))
-   *  $3: expiryWindowDays (Integer)
-   *  $4: limit (Integer, default 10)
-   */
   GET_EXPIRING_SERVICES_FEED: `
     SELECT 
         cs.client_service_id,
@@ -90,13 +68,6 @@ export const DASHBOARD_QUERIES = {
     LIMIT $4;
   `,
 
-  /**
-   * Fetches pending interaction follow-ups for the agent dashboard.
-   * Parameters:
-   *  $1: userRole ('ADMIN', 'MANAGER', 'USER')
-   *  $2: userId (VARCHAR(36))
-   *  $3: limit (Integer)
-   */
   GET_PENDING_FOLLOWUPS_FEED: `
     SELECT 
         icl.log_id,
@@ -116,9 +87,6 @@ export const DASHBOARD_QUERIES = {
     LIMIT $3;
   `,
 
-  /**
-   * Breakdown of prospects grouped by status (NEW, IN_PROGRESS, CONVERTED, REJECTED).
-   */
   GET_PROSPECT_STATUS_BREAKDOWN: `
     SELECT 
         status, 
@@ -127,3 +95,5 @@ export const DASHBOARD_QUERIES = {
     GROUP BY status;
   `
 };
+
+module.exports = { DASHBOARD_QUERIES };

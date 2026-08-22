@@ -9,6 +9,12 @@ export interface MasterProduct {
   price?: number;
 }
 
+export interface DocumentMetadata {
+  file_name: string;
+  file_path_or_uri: string;
+  storage_driver: 'LOCAL' | 'S3' | 'BLOB';
+}
+
 export interface Prospect {
   prospect_id: string;
   prospect_name: string;
@@ -20,11 +26,15 @@ export interface Prospect {
   country?: string | null; 
   geo_location?: string | null;
   preferred_product_id?: string | null;
-  product_name?: string | null; // Joined field from Master_Product
+  preferred_product_name?: string | null;
   preferred_plan_id?: string | null;
+  preferred_plan_name?: string | null;
+  product_name?: string | null; // Joined field from Master_Product
   status: ProspectStatus;
   created_at: string;
 }
+
+export type UploadableDocument = DocumentMetadata | File;
 
 export interface CreateProspectDTO {
   prospect_name: string;
@@ -37,6 +47,8 @@ export interface CreateProspectDTO {
   geo_location?: string;
   preferred_product_id?: string;
   preferred_plan_id?: string;
+  documents?: UploadableDocument[];
+  service_preferences?: Array<{ product_id: string; plan_id: string }>;
   status?: ProspectStatus;
 }
 
@@ -45,7 +57,7 @@ export interface UpdateProspectDTO extends Partial<CreateProspectDTO> {
 }
 
 export interface ConvertProspectPayload {
-  account_id: string; // Business Account Number
+  account_id?: string; // Business Account Number
   client_name: string;
   contact_number: string;
   secondary_contact_number?: string;
@@ -56,6 +68,7 @@ export interface ConvertProspectPayload {
   country?: string;
   latitude?: number | null;
   longitude?: number | null;
+  documents?: UploadableDocument[];
 }
 
 export interface ConvertProspectResponse {
